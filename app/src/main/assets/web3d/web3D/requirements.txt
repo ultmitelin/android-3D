@@ -1,0 +1,10 @@
+# 本项目为纯静态 HTML 页面，运行时不依赖任何 Python 第三方包。
+#
+# 本地预览仅使用 Python 标准库的 http.server（Python >= 3.8 自带）：
+#   python -m http.server 8000
+#
+# 前端依赖已全部本地化到 libs/ 目录，无需 npm / pip 安装：
+#   - Google model-viewer （libs/model-viewer.min.js）
+#   - three.js            （libs/three.module.js + libs/addons/）
+#
+# （此文件留空即表示无第三方依赖）

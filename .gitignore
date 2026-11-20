@@ -1,0 +1,29 @@
+# Gradle / Android 构建产物
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+
+# 本地配置（含 SDK 路径等机器相关配置）
+local.properties
+
+# IDE
+.idea/
+*.iml
+*.hprof
+.DS_Store
+
+# 签名文件
+*.jks
+*.keystore
+
+# 3D 模型资源：体积大（约 1.3 GB），按方案 B 独立存放，不纳入仓库
+# 需要时通过 Android 私有目录分发
+app/src/main/assets/web3d/web3D/models/**/*.glb
+app/src/main/assets/web3d/web3D/models/**/*.gltf
+app/src/main/assets/web3d/web3D/models/**/*.bin

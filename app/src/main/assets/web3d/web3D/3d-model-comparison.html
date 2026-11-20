@@ -1,0 +1,2639 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+
+  <title>3D模型横向对比查看器</title>
+
+  <!--
+    单文件 3D 对比页面
+    依赖：Google <model-viewer>（通过 CDN 加载）
+    推荐模型格式：.glb
+  -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./libs/three.module.js",
+        "three/addons/": "./libs/addons/"
+      }
+    }
+  </script>
+  <script
+    type="module"
+    src="libs/model-viewer.min.js">
+  </script>
+
+  
+
+  <style>
+    :root {
+      --bg: #070910;
+      --panel: rgba(18, 21, 32, 0.92);
+      --panel-2: rgba(25, 29, 43, 0.88);
+      --line: rgba(255, 255, 255, 0.12);
+      --line-strong: rgba(255, 255, 255, 0.22);
+      --text: #f4f6fb;
+      --muted: #9ca6ba;
+      --accent: #7c8cff;
+      --accent-2: #9f7aea;
+      --success: #4ade80;
+      --danger: #fb7185;
+      --radius: 18px;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-width: 320px;
+      background: var(--bg);
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 10%, rgba(124, 140, 255, 0.16), transparent 26%),
+        radial-gradient(circle at 85% 8%, rgba(159, 122, 234, 0.13), transparent 25%),
+        linear-gradient(180deg, #0a0c14 0%, #070910 48%, #05070c 100%);
+      font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button,
+    .file-button {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .page-shell {
+      width: min(1920px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 48px;
+    }
+
+    .hero {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 20px;
+    }
+
+    .hero-copy {
+      max-width: 850px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: #b8c0ff;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 54px);
+      line-height: 1.06;
+      letter-spacing: -0.035em;
+    }
+
+    .subtitle {
+      max-width: 760px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .top-badge {
+      flex: none;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #cfd5e6;
+      background: rgba(255, 255, 255, 0.045);
+      font-size: 12px;
+      white-space: nowrap;
+      backdrop-filter: blur(16px);
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 12px;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(10, 12, 20, 0.76);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px);
+    }
+
+    .toolbar-spacer {
+      flex: 1;
+    }
+
+    .button,
+    .file-button {
+      display: inline-flex;
+      min-height: 40px;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.055);
+      cursor: pointer;
+      transition:
+        transform 140ms ease,
+        border-color 140ms ease,
+        background 140ms ease;
+    }
+
+    .button:hover,
+    .file-button:hover {
+      border-color: var(--line-strong);
+      background: rgba(255, 255, 255, 0.09);
+      transform: translateY(-1px);
+    }
+
+    .button:active,
+    .file-button:active {
+      transform: translateY(0);
+    }
+
+    .button.primary {
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 10px 24px rgba(124, 140, 255, 0.22);
+    }
+
+    .button.danger {
+      color: #ffc2cc;
+    }
+
+    .toggle {
+      display: inline-flex;
+      min-height: 40px;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      color: #d8ddec;
+      background: rgba(255, 255, 255, 0.04);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle input {
+      accent-color: var(--accent);
+    }
+
+    .tip {
+      margin-left: 2px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .comparison-group {
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .comparison-group:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .group-title {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .group-load-button {
+      min-width: 0;
+      min-height: 30px;
+      padding: 4px 12px;
+      border-radius: 9px;
+      font-size: 12px;
+    }
+
+    .group-load-button.is-close {
+      border-color: transparent;
+      background: linear-gradient(135deg, #fb7185, #e11d48);
+      box-shadow: 0 10px 24px rgba(225, 29, 72, 0.28);
+    }
+
+    .compare-card:fullscreen {
+      display: flex;
+      flex-direction: column;
+      border: 0;
+      border-radius: 0;
+      background: #0d1018;
+    }
+
+    .compare-card:fullscreen .viewer-surface {
+      flex: 1;
+      aspect-ratio: auto;
+      min-height: 0;
+    }
+
+    .compare-card:fullscreen .card-controls {
+      display: none;
+    }
+
+    .compare-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    /* 第二行第一张卡片从第 2 列开始，与第一行的 3D 模型对齐 */
+    .compare-grid > :nth-child(5) {
+      grid-column-start: 2;
+    }
+
+    /* 选中对比 */
+    .compare-card.is-duel-selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent), var(--shadow);
+    }
+
+    .duel-toggle {
+      flex: none;
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      border: 2px solid #d8ddec;
+      border-radius: 50%;
+      background: rgba(7, 9, 16, 0.55);
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: border-color 140ms ease, background 140ms ease;
+    }
+
+    .duel-toggle:hover {
+      border-color: var(--accent);
+    }
+
+    .duel-toggle.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(124, 140, 255, 0.75);
+    }
+
+    #duelButton:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .duel-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: none;
+      background: #0d1018;
+    }
+
+    body.duel-active .duel-backdrop {
+      display: block;
+    }
+
+    body.duel-active {
+      overflow: hidden;
+    }
+
+    .compare-card.duel-pane {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      z-index: 1001;
+      display: flex;
+      flex-direction: column;
+      margin: 0;
+      border-radius: 0;
+      border-right: 1px solid var(--line-strong);
+      box-shadow: none;
+    }
+
+    .compare-card.duel-pane .viewer-surface {
+      flex: 1;
+      aspect-ratio: auto;
+      min-height: 0;
+    }
+
+    .compare-card.duel-pane .card-controls {
+      display: none;
+    }
+
+    .duel-close {
+      position: fixed;
+      top: 14px;
+      right: 16px;
+      z-index: 1002;
+      display: none;
+      padding: 8px 16px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      color: #fff;
+      background: rgba(7, 9, 16, 0.8);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+
+    body.duel-active .duel-close {
+      display: inline-flex;
+    }
+
+    .compare-card {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      min-height: 58px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .card-title-wrap {
+      min-width: 0;
+    }
+
+    .card-kicker {
+      display: none;
+    }
+
+    .card-title {
+      overflow: hidden;
+      margin: 0;
+      font-size: 15px;
+      font-weight: 750;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .status {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(0, 0, 0, 0.16);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .status::before {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #6b7280;
+      content: "";
+    }
+
+    .status[data-state="loading"]::before {
+      background: #facc15;
+      box-shadow: 0 0 12px rgba(250, 204, 21, 0.7);
+    }
+
+    .status[data-state="ready"]::before {
+      background: var(--success);
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.62);
+    }
+
+    .status[data-state="error"] {
+      color: #ffc1cc;
+    }
+
+    .status[data-state="error"]::before {
+      background: var(--danger);
+      box-shadow: 0 0 12px rgba(251, 113, 133, 0.62);
+    }
+
+    .viewer-surface,
+    .input-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      background:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.022) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255, 255, 255, 0.022) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.022) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.022) 75%),
+        radial-gradient(circle at 50% 42%, #252a38 0%, #131722 48%, #0d1018 100%);
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+      background-size: 20px 20px;
+    }
+
+    .viewer-surface {
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .viewer-surface.is-orbiting {
+      cursor: grabbing;
+    }
+
+    model-viewer {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      pointer-events: none;
+      --poster-color: transparent;
+      --progress-bar-color: var(--accent);
+    }
+
+    .viewer-textured {
+      z-index: 1;
+      background: #13131a;
+    }
+
+    .viewer-clay {
+      z-index: 2;
+      background: #0d0d14;
+    }
+
+    .normal-canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: none;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .viewer-overlay-controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 12;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .viewer-overlay-controls .normal-toggle {
+      display: none;
+    }
+
+    .rotate-button {
+      padding: 5px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #d8ddec;
+      background: rgba(7, 9, 16, 0.7);
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+
+    .rotate-button:hover {
+      border-color: var(--line-strong);
+      background: rgba(20, 24, 38, 0.85);
+    }
+
+    .normal-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #d8ddec;
+      background: rgba(7, 9, 16, 0.7);
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+      backdrop-filter: blur(10px);
+    }
+
+    .normal-toggle input {
+      display: none;
+    }
+
+    .normal-switch {
+      position: relative;
+      width: 30px;
+      height: 16px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.18);
+      transition: background 0.2s;
+    }
+
+    .normal-switch::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s;
+    }
+
+    .normal-toggle input:checked + .normal-switch {
+      background: var(--accent);
+    }
+
+    .normal-toggle input:checked + .normal-switch::after {
+      transform: translateX(14px);
+    }
+
+    .viewer-empty {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      display: grid;
+      place-items: center;
+      padding: 26px;
+      color: var(--muted);
+      text-align: center;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+    }
+
+    .viewer-empty.is-hidden {
+      opacity: 0;
+    }
+
+    .empty-icon {
+      width: 54px;
+      height: 54px;
+      margin: 0 auto 12px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background:
+        linear-gradient(135deg, rgba(124, 140, 255, 0.22), rgba(159, 122, 234, 0.12));
+      box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.04);
+    }
+
+    .viewer-empty strong {
+      display: block;
+      margin-bottom: 5px;
+      color: #e3e7f2;
+      font-size: 13px;
+    }
+
+    .viewer-empty span {
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .split-label {
+      display: none;
+    }
+
+    .split-control {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      z-index: 10;
+      display: flex;
+      width: 30px;
+      align-items: center;
+      justify-content: center;
+      cursor: ew-resize;
+      touch-action: none;
+      transform: translateX(-50%);
+    }
+
+    .split-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      margin-left: -1px;
+      background: rgba(255, 255, 255, 0.7);
+      box-shadow: 0 0 6px rgba(124, 140, 255, 0.4);
+    }
+
+    .split-handle {
+      position: relative;
+      display: flex;
+      width: 26px;
+      height: 26px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 2px 8px rgba(124, 140, 255, 0.4);
+      font-size: 11px;
+      font-weight: 900;
+      cursor: ew-resize;
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    .image-placeholder,
+    .input-preview {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .input-preview {
+      z-index: 2;
+      display: none;
+      object-fit: contain;
+      background: rgba(4, 6, 10, 0.6);
+    }
+
+    .input-preview.is-visible {
+      display: block;
+    }
+
+    .image-placeholder {
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+    }
+
+    .image-placeholder svg {
+      width: 68%;
+      height: 68%;
+      opacity: 0.8;
+    }
+
+    .card-controls {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .url-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+    }
+
+    .url-input {
+      min-width: 0;
+      height: 38px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      outline: none;
+      border-radius: 10px;
+      color: #dfe4f0;
+      background: rgba(0, 0, 0, 0.22);
+      font-size: 11px;
+      transition:
+        border-color 140ms ease,
+        box-shadow 140ms ease;
+    }
+
+    .url-input:focus {
+      border-color: rgba(124, 140, 255, 0.72);
+      box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.13);
+    }
+
+    .small-button,
+    .file-button.small {
+      min-height: 38px;
+      padding: 8px 11px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .file-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .control-note {
+      color: #7f899e;
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    .group-note {
+      margin-top: 10px;
+      color: #7f899e;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .group-note code {
+      padding: 1px 5px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.25);
+      font-size: 10px;
+    }
+
+    .footer-note {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.035);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .footer-note code {
+      color: #c9d0ff;
+    }
+
+    @media (max-width: 1500px) {
+      .compare-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .compare-grid > :nth-child(5) {
+        grid-column-start: auto;
+      }
+    }
+
+    @media (max-width: 1000px) {
+      .compare-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
+      .page-shell {
+        width: min(100% - 20px, 1680px);
+        padding-top: 18px;
+      }
+
+      .hero {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .top-badge {
+        display: none;
+      }
+
+      .toolbar {
+        position: static;
+        flex-wrap: wrap;
+      }
+
+      .toolbar-spacer,
+      .tip {
+        display: none;
+      }
+
+      .compare-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .button,
+      .toggle {
+        flex: 1 1 auto;
+      }
+    }
+
+    /* ===== 精选展示组（Pixal3D + HY 贴图，8 卡，占满整行） ===== */
+    .compare-grid.showcase-grid > :nth-child(5) {
+      grid-column-start: auto;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Synchronized 3D Comparison</p>
+        <h1>3D模型横向对比查看器</h1>
+        <p class="subtitle">
+          拖动任意模型可同步旋转，滚轮或双指缩放；拖动分割线可在灰模（几何）
+          与纹理之间对照，开启“同步分割条”后所有卡片联动；
+          打开 Normal 开关可切换到法线视图检查几何细节。
+        </p>
+      </div>
+      <div class="top-badge">单文件 HTML · GLB 推荐</div>
+    </section>
+
+    <nav class="toolbar" aria-label="3D 查看器工具栏">
+      <button class="button primary" id="loadAllButton" type="button">载入第一组模型</button>
+      <button class="button danger" id="unloadAllButton" type="button">释放模型</button>
+      <button class="button" id="resetViewButton" type="button">重置视角</button>
+      <button class="button primary" id="duelButton" type="button" disabled>对比</button>
+
+      <label class="toggle">
+        <input id="autoRotateToggle" type="checkbox" checked>
+        自动旋转
+      </label>
+
+      <label class="toggle">
+        <input id="syncSliderToggle" type="checkbox" checked>
+        同步分割条
+      </label>
+
+      <label class="toggle">
+        <input id="normalModeToggle" type="checkbox">
+        全局 Normal
+      </label>
+
+      <div class="toolbar-spacer"></div>
+      <div class="tip">拖动旋转 · 滚轮/双指缩放 · 双击重置</div>
+    </nav>
+
+    <section class="comparison-group" data-comparison-group="0">
+      <div class="group-header"></div>
+      <div class="compare-grid" aria-label="第 1 组 3D 模型横向对比">
+      <!-- 输入图片 -->
+      <article class="compare-card">
+        <header class="card-header">
+          <div class="card-title-wrap">
+            <div class="card-kicker">Reference</div>
+            <h2 class="card-title">输入图片</h2>
+          </div>
+          <div class="status" id="imageStatus" data-state="idle">等待图片</div>
+        </header>
+
+        <div class="input-stage">
+          <div class="image-placeholder" id="imagePlaceholder" aria-hidden="true">
+            <svg viewBox="0 0 240 240" fill="none">
+              <rect x="38" y="42" width="164" height="156" rx="24"
+                    stroke="currentColor" stroke-width="4" opacity=".55"/>
+              <circle cx="91" cy="94" r="18"
+                      stroke="currentColor" stroke-width="4" opacity=".65"/>
+              <path d="M55 175L100 128L128 153L151 130L188 175"
+                    stroke="currentColor" stroke-width="4"
+                    stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>
+              <path d="M120 18V55M101 36.5H139"
+                    stroke="currentColor" stroke-width="4" stroke-linecap="round"
+                    opacity=".55"/>
+            </svg>
+          </div>
+          <img class="input-preview" id="inputPreview" alt="输入参考图">
+        </div>
+
+        <div class="card-controls">
+          <div class="url-row">
+            <input
+              class="url-input"
+              id="imageUrlInput"
+              type="url"
+              placeholder="输入图片 URL">
+            <button class="button small-button" id="applyImageUrlButton" type="button">应用</button>
+          </div>
+
+          <label class="file-button small">
+            选择本地图片
+            <input
+              class="file-input"
+              id="imageFileInput"
+              type="file"
+              accept="image/*">
+          </label>
+
+        </div>
+      </article>
+
+      <!-- 模型 A -->
+      <article
+        class="compare-card model-card"
+        data-model-card
+        data-split="50"
+        data-default-src="">
+        <header class="card-header">
+          <div class="card-title-wrap">
+            <div class="card-kicker">Pixal3D</div>
+            <h2 class="card-title">Pixal3D</h2>
+          </div>
+          <div class="status model-status" data-state="idle">未载入</div>
+        </header>
+
+        <div class="viewer-surface">
+          <model-viewer
+            class="viewer viewer-textured"
+            environment-image="neutral"
+            shadow-intensity="1.15"
+            shadow-softness="0.85"
+            exposure="1"
+            interaction-prompt="none"
+            loading="eager">
+          </model-viewer>
+
+          <model-viewer
+            class="viewer viewer-clay"
+            environment-image="neutral"
+            shadow-intensity="0"
+            exposure="0.8"
+            interaction-prompt="none"
+            loading="eager">
+          </model-viewer>
+
+          <div class="viewer-empty">
+            <div>
+              <div class="empty-icon"></div>
+              <strong>模型尚未载入</strong>
+              <span>点击“载入全部模型”，或上传本地 GLB。</span>
+            </div>
+          </div>
+
+          <div class="viewer-overlay-controls">
+            <button class="rotate-button" type="button" title="模型水平旋转90°">&#8635;90°</button>
+            <label class="normal-toggle">
+              <input class="normal-checkbox" type="checkbox">
+              <span class="normal-switch"></span>
+              <span>Normal</span>
+            </label>
+          </div>
+
+          <div class="split-control" role="slider" aria-label="灰模与纹理分割位置"
+               aria-valuemin="5" aria-valuemax="95" aria-valuenow="50">
+            <div class="split-line"></div>
+            <div class="split-handle">⇔</div>
+          </div>
+        </div>
+
+        <div class="card-controls">
+          <div class="url-row">
+            <input
+              class="url-input model-url"
+              type="url"
+              value="models/group-01/pixal3d.glb"
+              aria-label="模型 A URL">
+            <button class="button small-button apply-model-url" type="button">应用</button>
+          </div>
+
+          <label class="file-button small">
+            选择本地 GLB
+            <input class="file-input model-file" type="file" accept=".glb,model/gltf-binary">
+          </label>
+
+        </div>
+      </article>
+
+      <!-- 模型 B -->
+      <article
+        class="compare-card model-card"
+        data-model-card
+        data-split="50"
+        data-default-src="">
+        <header class="card-header">
+          <div class="card-title-wrap">
+            <div class="card-kicker">Pixal3D + HY3D</div>
+            <h2 class="card-title">Pixal3D + HY3D 贴图</h2>
+          </div>
+          <div class="status model-status" data-state="idle">未载入</div>
+        </header>
+
+        <div class="viewer-surface">
+          <model-viewer
+            class="viewer viewer-textured"
+            environment-image="neutral"
+            shadow-intensity="1.15"
+            shadow-softness="0.85"
+            exposure="1"
+            interaction-prompt="none"
+            loading="eager">
+          </model-viewer>
+
+          <model-viewer
+            class="viewer viewer-clay"
+            environment-image="neutral"
+            shadow-intensity="0"
+            exposure="0.8"
+            interaction-prompt="none"
+            loading="eager">
+          </model-viewer>
+
+          <div class="viewer-empty">
+            <div>
+              <div class="empty-icon"></div>
+              <strong>模型尚未载入</strong>
+              <span>点击“载入全部模型”，或上传本地 GLB。</span>
+            </div>
+          </div>
+
+          <div class="viewer-overlay-controls">
+            <button class="rotate-button" type="button" title="模型水平旋转90°">&#8635;90°</button>
+            <label class="normal-toggle">
+              <input class="normal-checkbox" type="checkbox">
+              <span class="normal-switch"></span>
+              <span>Normal</span>
+            </label>
+          </div>
+
+          <div class="split-control" role="slider" aria-label="灰模与纹理分割位置"
+               aria-valuemin="5" aria-valuemax="95" aria-valuenow="50">
+            <div class="split-line"></div>
+            <div class="split-handle">⇔</div>
+          </div>
+        </div>
+
+        <div class="card-controls">
+          <div class="url-row">
+            <input
+              class="url-input model-url"
+              type="url"
+              value="models/group-01/pixal3d-hy3d.glb"
+              aria-label="模型 B URL">
+            <button class="button small-button apply-model-url" type="button">应用</button>
+          </div>
+
+          <label class="file-button small">
+            选择本地 GLB
+            <input class="file-input model-file" type="file" accept=".glb,model/gltf-binary">
+          </label>
+
+        </div>
+      </article>
+
+      <!-- 模型 C -->
+      <article
+        class="compare-card model-card"
+        data-model-card
+        data-split="50"
+        data-default-src="">
+        <header class="card-header">
+          <div class="card-title-wrap">
+            <div class="card-kicker">Rodin Gen2.5</div>
+            <h2 class="card-title">Rodin Gen2.5-High</h2>
+          </div>
+          <div class="status model-status" data-state="idle">未载入</div>
+        </header>
+
+        <div class="viewer-surface">
+          <model-viewer
+            class="viewer viewer-textured"
+            environment-image="neutral"
+            shadow-intensity="1.15"
+            shadow-softness="0.85"
+            exposure="1"
+            interaction-prompt="none"
+            loading="eager">
+          </model-viewer>
+
+          <model-viewer
+            class="viewer viewer-clay"
+            environment-image="neutral"
+            shadow-intensity="0"
+            exposure="0.8"
+            interaction-prompt="none"
+            loading="eager">
+          </model-viewer>
+
+          <div class="viewer-empty">
+            <div>
+              <div class="empty-icon"></div>
+              <strong>模型尚未载入</strong>
+              <span>点击“载入全部模型”，或上传本地 GLB。</span>
+            </div>
+          </div>
+
+          <div class="viewer-overlay-controls">
+            <button class="rotate-button" type="button" title="模型水平旋转90°">&#8635;90°</button>
+            <label class="normal-toggle">
+              <input class="normal-checkbox" type="checkbox">
+              <span class="normal-switch"></span>
+              <span>Normal</span>
+            </label>
+          </div>
+
+          <div class="split-control" role="slider" aria-label="灰模与纹理分割位置"
+               aria-valuemin="5" aria-valuemax="95" aria-valuenow="50">
+            <div class="split-line"></div>
+            <div class="split-handle">⇔</div>
+          </div>
+        </div>
+
+        <div class="card-controls">
+          <div class="url-row">
+            <input
+              class="url-input model-url"
+              type="url"
+              value="models/group-01/rodin-gen2.5-high.glb"
+              aria-label="模型 C URL">
+            <button class="button small-button apply-model-url" type="button">应用</button>
+          </div>
+
+          <label class="file-button small">
+            选择本地 GLB
+            <input class="file-input model-file" type="file" accept=".glb,model/gltf-binary">
+          </label>
+
+        </div>
+      </article>
+
+      <!-- 模型 D -->
+      <article
+        class="compare-card model-card"
+        data-model-card
+        data-split="50"
+        data-default-src="">
+        <header class="card-header">
+          <div class="card-title-wrap">
+            <div class="card-kicker">Tripo V3.1</div>
+            <h2 class="card-title">Tripo V3.1</h2>
+          </div>
+          <div class="status model-status" data-state="idle">未载入</div>
+        </header>
+
+        <div class="viewer-surface">
+          <model-viewer
+            class="viewer viewer-textured"
+            environment-image="neutral"
+            shadow-intensity="1.15"
+            shadow-softness="0.85"
+            exposure="1"
+            interaction-prompt="none"
+            loading="eager">
+          </model-viewer>
+
+          <model-viewer
+            class="viewer viewer-clay"
+            environment-image="neutral"
+            shadow-intensity="0"
+            exposure="0.8"
+            interaction-prompt="none"
+            loading="eager">
+          </model-viewer>
+
+          <div class="viewer-empty">
+            <div>
+              <div class="empty-icon"></div>
+              <strong>模型尚未载入</strong>
+              <span>点击"载入全部模型"，或上传本地 GLB。</span>
+            </div>
+          </div>
+
+          <div class="viewer-overlay-controls">
+            <button class="rotate-button" type="button" title="模型水平旋转90°">&#8635;90°</button>
+            <label class="normal-toggle">
+              <input class="normal-checkbox" type="checkbox">
+              <span class="normal-switch"></span>
+              <span>Normal</span>
+            </label>
+          </div>
+
+          <div class="split-control" role="slider" aria-label="灰模与纹理分割位置"
+               aria-valuemin="5" aria-valuemax="95" aria-valuenow="50">
+            <div class="split-line"></div>
+            <div class="split-handle">⇔</div>
+          </div>
+        </div>
+
+        <div class="card-controls">
+          <div class="url-row">
+            <input
+              class="url-input model-url"
+              type="url"
+              value="models/group-01/tripo-v3.1.glb"
+              aria-label="模型 D URL">
+            <button class="button small-button apply-model-url" type="button">应用</button>
+          </div>
+
+          <label class="file-button small">
+            选择本地 GLB
+            <input class="file-input model-file" type="file" accept=".glb,model/gltf-binary">
+          </label>
+
+        </div>
+      </article>
+      </div>
+      <div class="group-note">
+        支持输入 URL 或上传本地文件替换参考图与模型；模型推荐使用单文件 <code>.glb</code>（避免外部纹理路径失效），不同模型会按各自默认距离进行相对缩放同步。
+      </div>
+    </section>
+
+    <div id="deferredGroups"></div>
+
+    <div class="footer-note">
+      每组包含<strong>一张参考图和六个方案模型</strong>。第 1 组保留 URL 与本地文件上传通道并自动载入；
+      第 2-5 组只读取下方预设路径，点击各组的“Load Models”后才加载 GLB，以减少初始内存占用。
+      每个卡片叠加两个相同模型，分割线<strong>左侧为灰模（几何）</strong>、<strong>右侧为纹理</strong>，
+      与 Pixal3D 项目页的对比效果一致。开启“同步分割条”时拖动任一分割线全部联动；
+      Normal 开关使用 three.js 以 <code>MeshNormalMaterial</code> 叠加渲染法线视图，
+      并与当前相机实时同步。若模型来源跨域，请确保服务器允许 CORS。
+      生产项目中建议预先统一模型的中心、朝向与单位。
+    </div>
+  </main>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+    (() => {
+      "use strict";
+
+      function prepareComparisonGroups() {
+        const firstGroup = document.querySelector('[data-comparison-group="0"]');
+        const firstGrid = firstGroup.querySelector('.compare-grid');
+        const sourceCards = [...firstGrid.querySelectorAll('[data-model-card]')];
+
+        const additionalModels = [
+          { kicker: 'Hunyuan3D', title: '混元3D' },
+          { kicker: 'Pixal3D (GGUF)', title: 'Pixal3D (GGUF)' }
+        ];
+
+        while (firstGrid.querySelectorAll('[data-model-card]').length < 6) {
+          const modelIndex = firstGrid.querySelectorAll('[data-model-card]').length;
+          const modelMeta = additionalModels[modelIndex - 4];
+          const card = sourceCards[sourceCards.length - 1].cloneNode(true);
+          card.querySelector('.card-kicker').textContent = modelMeta.kicker;
+          card.querySelector('.card-title').textContent = modelMeta.title;
+          card.querySelector('.model-status').textContent = '未载入';
+          card.querySelector('.model-status').dataset.state = 'idle';
+          const urlInput = card.querySelector('.model-url');
+          urlInput.value = '';
+          urlInput.setAttribute('aria-label', `${modelMeta.title} URL`);
+          firstGrid.appendChild(card);
+        }
+
+        const deferredGroups = document.getElementById('deferredGroups');
+        for (let groupIndex = 2; groupIndex < 6; groupIndex += 1) {
+          const group = firstGroup.cloneNode(true);
+          group.dataset.comparisonGroup = String(groupIndex);
+          const loadButton = document.createElement('button');
+          loadButton.className = 'button primary group-load-button';
+          loadButton.type = 'button';
+          loadButton.dataset.loadGroup = String(groupIndex);
+          loadButton.textContent = 'Load 3D';
+          group.querySelector('.group-header').appendChild(loadButton);
+          group.querySelector('.compare-grid').setAttribute(
+            'aria-label',
+            `第 ${groupIndex + 1} 组 3D 模型横向对比`
+          );
+
+          group.querySelector('.group-note')?.remove();
+          const reference = group.querySelector('.compare-card:not(.model-card)');
+          reference.querySelector('.card-controls')?.remove();
+          const preview = reference.querySelector('.input-preview');
+          preview.removeAttribute('id');
+          preview.removeAttribute('src');
+          preview.classList.remove('is-visible');
+          reference.querySelector('.image-placeholder')?.removeAttribute('id');
+          const imageState = reference.querySelector('.status');
+          imageState.removeAttribute('id');
+          imageState.textContent = '等待载入';
+          imageState.dataset.state = 'idle';
+
+          for (const card of group.querySelectorAll('[data-model-card]')) {
+            card.querySelector('.card-controls')?.remove();
+          }
+          deferredGroups.appendChild(group);
+        }
+
+        // ---- 精选展示组（第 2 组位置）：克隆 8 个模型卡片，自动加载、常驻 ----
+        {
+          const showcaseSection = document.createElement('section');
+          showcaseSection.className = 'comparison-group';
+          showcaseSection.dataset.comparisonGroup = '1';
+
+          const showcaseGrid = document.createElement('div');
+          showcaseGrid.className = 'compare-grid showcase-grid';
+          showcaseGrid.setAttribute('aria-label', 'Pixal3D + HY 贴图精选展示');
+
+          const template = sourceCards[0];
+          for (let i = 0; i < 8; i += 1) {
+            const card = template.cloneNode(true);
+            // 展示卡无需标题与状态徽标，删除整个头部
+            card.querySelector('.card-header')?.remove();
+            card.querySelector('.card-controls')?.remove();
+            card.dataset.showcase = 'true';
+            showcaseGrid.appendChild(card);
+          }
+
+          showcaseSection.appendChild(showcaseGrid);
+          deferredGroups.before(showcaseSection);
+        }
+
+        for (const group of document.querySelectorAll('[data-comparison-group]')) {
+          const groupIndex = Number(group.dataset.comparisonGroup);
+          [...group.querySelectorAll('[data-model-card]')].forEach((card, modelIndex) => {
+            card.dataset.groupIndex = String(groupIndex);
+            card.dataset.modelIndex = String(modelIndex);
+          });
+        }
+      }
+
+      prepareComparisonGroups();
+
+      const groups = [...document.querySelectorAll('[data-comparison-group]')];
+      const cards = [...document.querySelectorAll("[data-model-card]")];
+      const allViewers = [...document.querySelectorAll("model-viewer")];
+
+      // 第 1 组卡片添加全屏放大按钮 + 双卡对比选择
+      const duelSelection = [];
+      const duelButton = document.getElementById('duelButton');
+
+      const duelBackdrop = document.createElement('div');
+      duelBackdrop.className = 'duel-backdrop';
+      document.body.appendChild(duelBackdrop);
+
+      const duelClose = document.createElement('button');
+      duelClose.className = 'duel-close';
+      duelClose.type = 'button';
+      duelClose.textContent = '\u2715 退出对比';
+      document.body.appendChild(duelClose);
+
+      function updateDuelButton() {
+        const count = duelSelection.length;
+        duelButton.disabled = count < 2;
+        duelButton.textContent = count >= 2 ? `对比 (${count})` : '对比';
+      }
+
+      function toggleDuelSelect(card, button) {
+        const index = duelSelection.indexOf(card);
+        if (index >= 0) {
+          duelSelection.splice(index, 1);
+          card.classList.remove('is-duel-selected');
+          button.classList.remove('active');
+        } else {
+          if (duelSelection.length >= 3) {
+            const removed = duelSelection.shift();
+            removed.classList.remove('is-duel-selected');
+            removed._duelToggle?.classList.remove('active');
+          }
+          duelSelection.push(card);
+          card.classList.add('is-duel-selected');
+          button.classList.add('active');
+        }
+        updateDuelButton();
+      }
+
+      function enterDuel() {
+        const count = duelSelection.length;
+        if (count < 2 || count > 3) return;
+        duelSelection.forEach((card, index) => {
+          card.classList.add('duel-pane');
+          card.style.left = `${(100 / count) * index}vw`;
+          card.style.width = `${100 / count}vw`;
+        });
+        document.body.classList.add('duel-active');
+        window.dispatchEvent(new Event('resize'));
+      }
+
+      function exitDuel() {
+        document.body.classList.remove('duel-active');
+        for (const card of duelSelection) {
+          card.classList.remove('duel-pane');
+          card.style.left = '';
+          card.style.width = '';
+        }
+        updateDuelButton();
+        window.dispatchEvent(new Event('resize'));
+      }
+
+      duelButton.addEventListener('click', enterDuel);
+      duelClose.addEventListener('click', exitDuel);
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && document.body.classList.contains('duel-active')) {
+          exitDuel();
+        }
+      });
+
+      function clearDuelSelection() {
+        for (const card of duelSelection) {
+          card.classList.remove('is-duel-selected');
+          card._duelToggle?.classList.remove('active');
+        }
+        duelSelection.length = 0;
+        updateDuelButton();
+      }
+
+      // 点击卡片以外的区域时，取消全部选中
+      document.addEventListener('click', (event) => {
+        if (duelSelection.length === 0) return;
+        if (document.body.classList.contains('duel-active')) return;
+        if (event.target.closest('.compare-card')) return;
+        if (event.target.closest('#duelButton')) return;
+        clearDuelSelection();
+      });
+
+      for (const card of document.querySelectorAll('[data-comparison-group="0"] [data-model-card]')) {
+        const overlay = card.querySelector('.viewer-overlay-controls');
+        if (!overlay) continue;
+
+        const duelToggle = document.createElement('button');
+        duelToggle.className = 'duel-toggle';
+        duelToggle.type = 'button';
+        duelToggle.title = '选中 2-3 个模型后，点击工具栏"对比"按钮全屏对比';
+        duelToggle.addEventListener('click', (event) => {
+          event.stopPropagation();
+          toggleDuelSelect(card, duelToggle);
+        });
+        card._duelToggle = duelToggle;
+        overlay.appendChild(duelToggle);
+
+        const fsButton = document.createElement('button');
+        fsButton.className = 'rotate-button fullscreen-button';
+        fsButton.type = 'button';
+        fsButton.title = '全屏查看';
+        fsButton.textContent = '\u26F6';
+        fsButton.addEventListener('click', (event) => {
+          event.stopPropagation();
+          if (document.fullscreenElement === card) {
+            document.exitFullscreen();
+          } else {
+            card.requestFullscreen?.();
+          }
+        });
+        overlay.appendChild(fsButton);
+      }
+
+      // 精选展示组卡片：添加全屏按钮
+      for (const card of document.querySelectorAll('[data-showcase="true"]')) {
+        const overlay = card.querySelector('.viewer-overlay-controls');
+        if (!overlay) continue;
+
+        const fsButton = document.createElement('button');
+        fsButton.className = 'rotate-button fullscreen-button';
+        fsButton.type = 'button';
+        fsButton.title = '全屏查看';
+        fsButton.textContent = '\u26F6';
+        fsButton.addEventListener('click', (event) => {
+          event.stopPropagation();
+          if (document.fullscreenElement === card) {
+            document.exitFullscreen();
+          } else {
+            card.requestFullscreen?.();
+          }
+        });
+        overlay.appendChild(fsButton);
+      }
+
+      const loadAllButton = document.getElementById("loadAllButton");
+      const unloadAllButton = document.getElementById("unloadAllButton");
+      const resetViewButton = document.getElementById("resetViewButton");
+      const autoRotateToggle = document.getElementById("autoRotateToggle");
+      const syncSliderToggle = document.getElementById("syncSliderToggle");
+      const normalModeToggle = document.getElementById("normalModeToggle");
+
+      const inputPreview = document.getElementById("inputPreview");
+      const imagePlaceholder = document.getElementById("imagePlaceholder");
+      const imageStatus = document.getElementById("imageStatus");
+      const imageUrlInput = document.getElementById("imageUrlInput");
+      const imageFileInput = document.getElementById("imageFileInput");
+      const applyImageUrlButton = document.getElementById("applyImageUrlButton");
+
+      const state = {
+        theta: Math.PI,
+        phi: Math.PI / 2,
+        zoom: 1,
+        initialized: false,
+        autoRotate: true,
+        isInteracting: false,
+        resumeAutoRotateAt: 0,
+        lastFrameTime: performance.now()
+      };
+
+      const objectUrls = new Set();
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function setStatus(card, text, statusState) {
+        const status = card.querySelector(".model-status");
+        if (status) {
+          status.textContent = text;
+          status.dataset.state = statusState;
+        }
+      }
+
+      /* [DIAG] 调试日志辅助函数：只读，不修改任何状态 */
+      function __diagCardId(card) {
+        return `g${card.dataset.groupIndex}-m${card.dataset.modelIndex}`;
+      }
+      function __diagLog(tag, card, viewer, extra) {
+        try {
+          const kind = viewer.classList.contains("viewer-clay") ? "clay" :
+                       viewer.classList.contains("viewer-textured") ? "textured" : "unknown";
+          const cur = viewer.getAttribute("src") || "";
+          console.log(`[DIAG] t=${Math.round(performance.now())} ${tag} card=${__diagCardId(card)} viewer=${kind} src=${cur} lastSrc=${viewer.dataset.lastSrc || ""} loadedViewers=${card._loadedViewers ? card._loadedViewers.size : "null"} ${extra || ""}`);
+        } catch (e) {
+          console.log(`[DIAG] log-error ${e}`);
+        }
+      }
+
+      async function toggleNormalForCard(card, enable) {
+        const clayViewer = card.querySelector(".viewer-clay");
+        if (enable) {
+          if (card.dataset.loaded !== "true") return;
+          const n = await initNormal(card);
+          if (n) {
+            n.active = true;
+            if (clayViewer) clayViewer.style.visibility = "hidden";
+            n.canvas.style.display = "block";
+          }
+        } else {
+          if (card._normal) {
+            card._normal.active = false;
+            card._normal.canvas.style.display = "none";
+          }
+          if (clayViewer) clayViewer.style.visibility = "";
+        }
+      }
+
+      async function setGlobalNormalMode(active) {
+        normalModeToggle.disabled = true;
+        const changes = cards.map(async (card) => {
+          await toggleNormalForCard(card, active);
+        });
+        await Promise.all(changes);
+        normalModeToggle.disabled = false;
+      }
+
+      function getCardSource(card) {
+        const urlInput = card.querySelector(".model-url");
+        return card.dataset.source ||
+          (urlInput ? urlInput.value.trim() : "") ||
+          card.dataset.defaultSrc;
+      }
+
+      function applySplit(card, percent) {
+        const safePercent = clamp(percent, 5, 95);
+        const textured = card.querySelector(".viewer-textured");
+        const clay = card.querySelector(".viewer-clay");
+        const control = card.querySelector(".split-control");
+        const normalCanvas = card.querySelector(".normal-canvas");
+
+        // pixal3d 风格：灰模（几何）在左，纹理在右
+        clay.style.clipPath =
+          `inset(0 ${100 - safePercent}% 0 0)`;
+
+        textured.style.clipPath =
+          `inset(0 0 0 ${safePercent}%)`;
+
+        if (normalCanvas) {
+          normalCanvas.style.clipPath =
+            `inset(0 ${100 - safePercent}% 0 0)`;
+        }
+
+        control.style.left = `${safePercent}%`;
+        control.setAttribute("aria-valuenow", String(Math.round(safePercent)));
+        card.dataset.split = String(safePercent);
+      }
+
+      // “同步分割条”开启时，拖动任意一条分割线，所有卡片同步移动
+      function applySplitSynced(originCard, percent) {
+        if (syncSliderToggle.checked) {
+          for (const c of cards) {
+            applySplit(c, percent);
+          }
+        } else {
+          applySplit(originCard, percent);
+        }
+      }
+
+      async function turnIntoClay(viewer) {
+        try {
+          await viewer.updateComplete;
+
+          const model = viewer.model;
+          if (!model || !Array.isArray(model.materials)) {
+            return;
+          }
+
+          for (const material of model.materials) {
+            const pbr = material.pbrMetallicRoughness;
+
+            try {
+              pbr?.baseColorTexture?.setTexture(null);
+            } catch (_) {}
+
+            try {
+              pbr?.setBaseColorFactor([0.55, 0.52, 0.50, 1]);
+            } catch (_) {}
+
+            try {
+              pbr?.setMetallicFactor(0);
+            } catch (_) {}
+
+            try {
+              pbr?.setRoughnessFactor(0.7);
+            } catch (_) {}
+
+            try {
+              material.normalTexture?.setTexture(null);
+            } catch (_) {}
+
+            try {
+              material.occlusionTexture?.setTexture(null);
+            } catch (_) {}
+
+            try {
+              material.emissiveTexture?.setTexture(null);
+            } catch (_) {}
+
+            try {
+              material.setEmissiveFactor([0, 0, 0]);
+            } catch (_) {}
+          }
+        } catch (error) {
+          console.warn("灰模材质处理失败：", error);
+        }
+      }
+
+      // ---- 法线（Normal）视图：three.js MeshNormalMaterial 叠加渲染 ----
+      const gltfLoader = new GLTFLoader();
+
+      function destroyNormal(card) {
+        const n = card._normal;
+        const checkbox = card.querySelector(".normal-checkbox");
+        const clay = card.querySelector(".viewer-clay");
+
+        if (checkbox) {
+          checkbox.checked = false;
+        }
+        if (clay) {
+          clay.style.visibility = "";
+        }
+        if (!n) {
+          return;
+        }
+        if (n.canvas) {
+          n.canvas.remove();
+        }
+        if (n.renderer) {
+          n.renderer.dispose();
+        }
+        card._normal = null;
+      }
+
+      async function initNormal(card) {
+        if (card._normal) {
+          return card._normal;
+        }
+
+        const surface = card.querySelector(".viewer-surface");
+        const source = card.dataset.source;
+        if (!source) {
+          return null;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.className = "normal-canvas";
+        surface.appendChild(canvas);
+
+        const rect = surface.getBoundingClientRect();
+        const renderer = new THREE.WebGLRenderer({
+          canvas,
+          antialias: true,
+          alpha: true
+        });
+        renderer.setSize(rect.width, rect.height);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setClearColor(0x0d0d14, 1);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(
+          30,
+          rect.width / rect.height,
+          0.01,
+          100
+        );
+
+        const normal = {
+          canvas,
+          renderer,
+          scene,
+          camera,
+          ready: false,
+          active: false,
+          source
+        };
+        normal.readyPromise = null;
+        card._normal = normal;
+
+        // 同步当前分割位置的裁剪
+        applySplit(card, Number(card.dataset.split || 50));
+
+        normal.readyPromise = (async () => {
+          try {
+            const gltf = await gltfLoader.loadAsync(source);
+            const model = gltf.scene;
+            const normalMat = new THREE.MeshNormalMaterial();
+
+            model.traverse((child) => {
+              if (child.isMesh) {
+                if (!child.geometry.getAttribute('normal')) {
+                  child.geometry.computeVertexNormals();
+                }
+                child.material = normalMat;
+              }
+            });
+
+            const orientation = (card.dataset.orientation || "").trim();
+            if (orientation) {
+              const deg = orientation.split(/\s+/)
+                .map((v) => (parseFloat(v) || 0) * Math.PI / 180);
+              model.rotation.set(deg[1], deg[2], deg[0], "YXZ");
+            }
+
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            model.position.sub(center);
+            scene.add(model);
+            normal.model = model;
+            normal.ready = true;
+          } catch (error) {
+            console.warn("法线视图模型载入失败：", error);
+          }
+          return normal.ready;
+        })();
+
+        await normal.readyPromise;
+        return normal;
+      }
+
+      function renderNormals() {
+        for (const card of cards) {
+          const n = card._normal;
+          if (!n || !n.ready || !n.active) {
+            continue;
+          }
+
+          const surface = card.querySelector(".viewer-surface");
+          const rect = surface.getBoundingClientRect();
+          const w = Math.round(rect.width);
+          const h = Math.round(rect.height);
+          const dpr = window.devicePixelRatio;
+
+          if (
+            n.renderer.domElement.width !== w * dpr ||
+            n.renderer.domElement.height !== h * dpr
+          ) {
+            n.renderer.setSize(w, h);
+            n.camera.aspect = w / h;
+          }
+
+          const textured = card.querySelector(".viewer-textured");
+
+          // 直接读取贴图 viewer 的实时相机距离与 FOV，
+          // 保证法线视图与贴图视图的缩放比例完全一致
+          // （model-viewer 内部有缩放钳制和平滑过渡）。
+          let radius = NaN;
+          let fov = NaN;
+          try {
+            radius = textured.getCameraOrbit().radius;
+            fov = textured.getFieldOfView();
+          } catch (error) { /* viewer 尚未就绪时回退到旧算法 */ }
+
+          if (!Number.isFinite(radius) || radius <= 0) {
+            const baseRadius = Number(textured.dataset.baseRadius);
+            radius =
+              (Number.isFinite(baseRadius) && baseRadius > 0 ? baseRadius : 2) *
+              state.zoom;
+          }
+
+          if (!Number.isFinite(fov) || fov <= 0) {
+            const baseFov = Number(textured.dataset.baseFov);
+            fov = Number.isFinite(baseFov) && baseFov > 0 ? baseFov : 30;
+          }
+
+          n.camera.position.set(
+            radius * Math.sin(state.phi) * Math.sin(state.theta),
+            radius * Math.cos(state.phi),
+            radius * Math.sin(state.phi) * Math.cos(state.theta)
+          );
+          n.camera.lookAt(0, 0, 0);
+          n.camera.fov = fov;
+          n.camera.updateProjectionMatrix();
+          n.renderer.render(n.scene, n.camera);
+        }
+      }
+
+      function storeViewerCamera(viewer) {
+        try {
+          const orbit = viewer.getCameraOrbit();
+          const fov = viewer.getFieldOfView();
+
+          if (Number.isFinite(orbit.radius) && orbit.radius > 0) {
+            viewer.dataset.baseRadius = String(orbit.radius);
+          }
+
+          if (Number.isFinite(fov) && fov > 0) {
+            viewer.dataset.baseFov = String(fov);
+          }
+
+          if (!state.initialized && viewer.classList.contains("viewer-textured")) {
+            if (Number.isFinite(orbit.theta)) {
+              state.theta = orbit.theta;
+            }
+            if (Number.isFinite(orbit.phi)) {
+              state.phi = orbit.phi;
+            }
+            state.initialized = true;
+          }
+        } catch (error) {
+          console.warn("读取相机参数失败：", error);
+        }
+      }
+
+      function syncCameras() {
+        for (const viewer of allViewers) {
+          if (!viewer.src) {
+            continue;
+          }
+
+          const baseFov = Number(viewer.dataset.baseFov);
+          const fov =
+            Number.isFinite(baseFov) && baseFov > 0 ? baseFov : 30;
+          const zoomPercent = 100 * state.zoom;
+
+          viewer.cameraOrbit =
+            `${state.theta}rad ${state.phi}rad ${zoomPercent}%`;
+          viewer.fieldOfView = `${fov}deg`;
+        }
+      }
+
+      function markCardLoading(card) {
+        card._loadedViewers = new Set();
+        card.querySelector(".viewer-empty").classList.remove("is-hidden");
+        setStatus(card, "载入中", "loading");
+      }
+
+      function loadCard(card, sourceOverride) {
+        const source = (sourceOverride || getCardSource(card)).trim();
+
+        if (!source) {
+          setStatus(card, "缺少地址", "error");
+          return;
+        }
+
+        card.dataset.source = source;
+        card.dataset.loaded = "true";
+        destroyNormal(card);
+        markCardLoading(card);
+        console.log(`[DIAG] t=${Math.round(performance.now())} LOADCARD-START card=${__diagCardId(card)} source=${source}`);
+
+        const orientation = card.dataset.orientation || "0deg 0deg 0deg";
+        for (const viewer of card.querySelectorAll("model-viewer")) {
+          viewer.setAttribute("orientation", orientation);
+          viewer.style.visibility = "";
+          __diagLog("LOADCARD-SET-SRC-BEFORE", card, viewer, `newSrc=${source}`);
+          viewer.src = source;
+        }
+
+        if (normalModeToggle && normalModeToggle.checked) {
+          toggleNormalForCard(card, true);
+        }
+      }
+
+      function loadGroup(groupIndex) {
+        const group = groups[groupIndex];
+        const preset = PRESET.groups[groupIndex] || {};
+        if (groupIndex > 0 && preset.image && preset.image.trim()) {
+          showGroupImage(group, preset.image.trim(), '已就绪');
+        }
+
+        let loadCount = 0;
+        const groupCards = cards.filter(
+          (card) => Number(card.dataset.groupIndex) === groupIndex
+        );
+        for (const card of groupCards) {
+          const source = getCardSource(card);
+          if (source) {
+            loadCard(card, source);
+            loadCount += 1;
+          } else {
+            setStatus(card, "缺少地址", "error");
+          }
+        }
+        return loadCount;
+      }
+
+      function loadAllModels() {
+        loadGroup(0);
+      }
+
+      function unloadCard(card) {
+        destroyNormal(card);
+
+        for (const viewer of card.querySelectorAll("model-viewer")) {
+          viewer.removeAttribute("src");
+          // model-viewer 移除 src 后仍会显示上一个模型，强制隐藏
+          viewer.style.visibility = "hidden";
+          viewer.dataset.baseRadius = "";
+          viewer.dataset.baseFov = "";
+        }
+
+        card.dataset.loaded = "false";
+        card._loadedViewers = new Set();
+        card.querySelector(".viewer-empty").classList.remove("is-hidden");
+        setStatus(card, "未载入", "idle");
+      }
+
+      function resetView() {
+        state.theta = Math.PI;
+        state.phi = Math.PI / 2;
+        state.zoom = 1;
+        state.resumeAutoRotateAt = performance.now() + 1200;
+        syncCameras();
+      }
+
+      function pauseAutoRotateTemporarily(delay = 1800) {
+        state.resumeAutoRotateAt = performance.now() + delay;
+      }
+
+      for (const card of cards) {
+        const surface = card.querySelector(".viewer-surface");
+        const viewers = [...card.querySelectorAll("model-viewer")];
+        const texturedViewer = card.querySelector(".viewer-textured");
+        const clayViewer = card.querySelector(".viewer-clay");
+        const fileInput = card.querySelector(".model-file");
+        const urlInput = card.querySelector(".model-url");
+        const applyUrlButton = card.querySelector(".apply-model-url");
+        const splitControl = card.querySelector(".split-control");
+        const normalCheckbox = card.querySelector(".normal-checkbox");
+
+        card._loadedViewers = new Set();
+        card._activeObjectUrl = null;
+
+        applySplit(card, Number(card.dataset.split || 50));
+
+        for (const viewer of viewers) {
+          viewer.addEventListener("load", async (event) => {
+            __diagLog("LOAD-EVENT", card, viewer, `detailUrl=${event && event.detail ? event.detail.url : "n/a"}`);
+            // orientation 变化也会触发 load，此时 src 未变，只需同步相机
+            const curSrc = viewer.getAttribute('src') || '';
+            const lastSrc = viewer.dataset.lastSrc || '';
+            viewer.dataset.lastSrc = curSrc;
+            storeViewerCamera(viewer);
+            if (curSrc && curSrc === lastSrc) {
+              __diagLog("LOAD-SKIP-SAME-SRC", card, viewer, "branch=sync-camera-return");
+              syncCameras();
+              return;
+            }
+            if (card._loadedViewers) card._loadedViewers.add(viewer);
+            __diagLog("LOAD-ADDED-TO-SET", card, viewer);
+            if (viewer === clayViewer) {
+              await turnIntoClay(viewer);
+              __diagLog("LOAD-AFTER-CLAY", card, viewer);
+            }
+            const emptyEl = card.querySelector('.viewer-empty');
+            if (emptyEl) emptyEl.classList.add('is-hidden');
+            __diagLog("LOAD-MASK-HIDDEN", card, viewer);
+            setStatus(card, '已就绪', 'ready');
+            __diagLog("LOAD-SETSTATUS-READY", card, viewer, `statusText=${card.querySelector('.model-status')?.textContent}`);
+            updateGroupLoadButton(Number(card.dataset.groupIndex));
+            syncCameras();
+          });;
+
+          viewer.addEventListener("error", (event) => {
+            const errType = event && event.detail ? event.detail.type : "n/a";
+            const errMsg = event && event.detail && event.detail.sourceError ? String(event.detail.sourceError) : "n/a";
+            __diagLog("ERROR-EVENT", card, viewer, `detailType=${errType} sourceError=${errMsg}`);
+            if (!card._loadedViewers || card._loadedViewers.size === 0) {
+              __diagLog("ERROR-BRANCH-SETFAIL", card, viewer);
+              card.dataset.loaded = "false";
+              setStatus(card, "载入失败", "error");
+              __diagLog("ERROR-SETSTATUS-FAILED", card, viewer);
+            } else {
+              __diagLog("ERROR-BRANCH-SKIPPED", card, viewer, "reason=loadedViewers-nonempty");
+            }
+          });
+        }
+
+        if (applyUrlButton) applyUrlButton.addEventListener("click", () => {
+          const source = urlInput.value.trim();
+          if (!source) {
+            setStatus(card, "请输入地址", "error");
+            return;
+          }
+
+          card.dataset.source = source;
+          loadCard(card, source);
+        });
+
+        if (fileInput) fileInput.addEventListener("change", () => {
+          const file = fileInput.files?.[0];
+          if (!file) {
+            return;
+          }
+
+          if (card._activeObjectUrl) {
+            URL.revokeObjectURL(card._activeObjectUrl);
+            objectUrls.delete(card._activeObjectUrl);
+          }
+
+          const objectUrl = URL.createObjectURL(file);
+          card._activeObjectUrl = objectUrl;
+          objectUrls.add(objectUrl);
+          card.dataset.source = objectUrl;
+          if (urlInput) urlInput.value = `[本地文件] ${file.name}`;
+          loadCard(card, objectUrl);
+        });
+
+        // 同步旋转 + 双指缩放
+        const pointers = new Map();
+        let lastSinglePoint = null;
+        let lastPinchDistance = null;
+
+        surface.addEventListener("pointerdown", (event) => {
+          if (
+            event.target.closest(".split-control") ||
+            event.target.closest(".viewer-overlay-controls")
+          ) {
+            return;
+          }
+
+          if (event.pointerType === "mouse" && event.button !== 0) {
+            return;
+          }
+
+          pointers.set(event.pointerId, {
+            x: event.clientX,
+            y: event.clientY
+          });
+
+          surface.setPointerCapture(event.pointerId);
+          surface.classList.add("is-orbiting");
+          state.isInteracting = true;
+          pauseAutoRotateTemporarily();
+
+          if (pointers.size === 1) {
+            lastSinglePoint = {
+              x: event.clientX,
+              y: event.clientY
+            };
+            lastPinchDistance = null;
+          }
+
+          if (pointers.size === 2) {
+            const [a, b] = [...pointers.values()];
+            lastPinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
+          }
+
+          event.preventDefault();
+        });
+
+        surface.addEventListener("pointermove", (event) => {
+          if (!pointers.has(event.pointerId)) {
+            return;
+          }
+
+          pointers.set(event.pointerId, {
+            x: event.clientX,
+            y: event.clientY
+          });
+
+          if (pointers.size === 1 && lastSinglePoint) {
+            const dx = event.clientX - lastSinglePoint.x;
+            const dy = event.clientY - lastSinglePoint.y;
+
+            state.theta -= dx * 0.008;
+            state.phi = clamp(
+              state.phi - dy * 0.008,
+              0.08,
+              Math.PI - 0.08
+            );
+
+            lastSinglePoint = {
+              x: event.clientX,
+              y: event.clientY
+            };
+
+            syncCameras();
+          } else if (pointers.size === 2) {
+            const [a, b] = [...pointers.values()];
+            const distance = Math.hypot(a.x - b.x, a.y - b.y);
+
+            if (lastPinchDistance && distance > 0) {
+              state.zoom = clamp(
+                state.zoom * (lastPinchDistance / distance),
+                0.32,
+                4
+              );
+              syncCameras();
+            }
+
+            lastPinchDistance = distance;
+          }
+
+          pauseAutoRotateTemporarily();
+          event.preventDefault();
+        });
+
+        function endPointer(event) {
+          pointers.delete(event.pointerId);
+
+          if (pointers.size === 1) {
+            const remaining = [...pointers.values()][0];
+            lastSinglePoint = { ...remaining };
+            lastPinchDistance = null;
+          } else if (pointers.size === 0) {
+            lastSinglePoint = null;
+            lastPinchDistance = null;
+            surface.classList.remove("is-orbiting");
+            state.isInteracting = false;
+          }
+
+          pauseAutoRotateTemporarily();
+        }
+
+        surface.addEventListener("pointerup", endPointer);
+        surface.addEventListener("pointercancel", endPointer);
+        surface.addEventListener("lostpointercapture", endPointer);
+
+        surface.addEventListener(
+          "wheel",
+          (event) => {
+            state.zoom = clamp(
+              state.zoom * Math.exp(event.deltaY * 0.003),
+              0.2,
+              5
+            );
+
+            pauseAutoRotateTemporarily();
+            syncCameras();
+            event.preventDefault();
+          },
+          { passive: false }
+        );
+
+        surface.addEventListener("dblclick", resetView);
+
+        // 灰模 / 纹理分割线（pixal3d 风格：整条可拖，可跨卡片同步）
+        let draggingSplit = false;
+
+        function updateSplitFromPointer(event) {
+          const rect = surface.getBoundingClientRect();
+          const percent =
+            ((event.clientX - rect.left) / rect.width) * 100;
+          applySplitSynced(card, percent);
+        }
+
+        splitControl.addEventListener("pointerdown", (event) => {
+          draggingSplit = true;
+          splitControl.setPointerCapture(event.pointerId);
+          updateSplitFromPointer(event);
+          event.stopPropagation();
+          event.preventDefault();
+        });
+
+        splitControl.addEventListener("pointermove", (event) => {
+          if (!draggingSplit) {
+            return;
+          }
+
+          updateSplitFromPointer(event);
+          event.stopPropagation();
+          event.preventDefault();
+        });
+
+        function stopSplitDrag(event) {
+          draggingSplit = false;
+          event.stopPropagation();
+        }
+
+        splitControl.addEventListener("pointerup", stopSplitDrag);
+        splitControl.addEventListener("pointercancel", stopSplitDrag);
+
+        splitControl.tabIndex = 0;
+        splitControl.addEventListener("keydown", (event) => {
+          const current = Number(card.dataset.split || 50);
+          if (event.key === "ArrowLeft") {
+            applySplitSynced(card, current - 2);
+            event.preventDefault();
+          }
+          if (event.key === "ArrowRight") {
+            applySplitSynced(card, current + 2);
+            event.preventDefault();
+          }
+        });
+
+        // ↻90° 按钮：水平旋转模型，用于校正侧身/朝向不齐的模型
+        const rotateButton = card.querySelector(".rotate-button");
+        rotateButton.addEventListener("click", (event) => {
+          event.stopPropagation();
+
+          const parts = (card.dataset.orientation || "0deg 0deg 0deg")
+            .split(/\s+/);
+          const yaw = (((parseFloat(parts[2]) || 0) + 90) % 360);
+          const orientation = `${parts[0]} ${parts[1]} ${yaw}deg`;
+          card.dataset.orientation = orientation;
+
+          for (const viewer of card.querySelectorAll("model-viewer")) {
+            viewer.setAttribute("orientation", orientation);
+          }
+
+          // 如果法线视图已加载，同步旋转法线模型
+          const n = card._normal;
+          if (n && n.model && n.ready) {
+            try {
+              const deg = orientation.split(/\s+/)
+                .map((v) => (parseFloat(v) || 0) * Math.PI / 180);
+              n.model.position.set(0, 0, 0);
+              n.model.rotation.set(deg[1], deg[2], deg[0], "YXZ");
+              // 用 three.js scene 自带的工具重新居中，避免直接引用 THREE 全局
+              const _box = { min: { x:0,y:0,z:0 }, max: { x:0,y:0,z:0 } };
+              let minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
+              n.model.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                  child.geometry.computeBoundingBox();
+                  const bb = child.geometry.boundingBox;
+                  if (bb) {
+                    minX=Math.min(minX,bb.min.x); minY=Math.min(minY,bb.min.y); minZ=Math.min(minZ,bb.min.z);
+                    maxX=Math.max(maxX,bb.max.x); maxY=Math.max(maxY,bb.max.y); maxZ=Math.max(maxZ,bb.max.z);
+                  }
+                }
+              });
+              if (isFinite(minX)) {
+                n.model.position.set(
+                  -((minX+maxX)/2),
+                  -((minY+maxY)/2),
+                  -((minZ+maxZ)/2)
+                );
+              }
+            } catch (_) {}
+          }
+
+          console.log((card.querySelector(".card-title")?.textContent || "展示卡") +
+            " 当前朝向: " + orientation);
+        });
+
+        // Normal（法线）视图开关：隐藏灰模副本，叠加 three.js 法线渲染
+        normalCheckbox.addEventListener("change", async () => {
+          if (normalCheckbox.checked) {
+            if (card.dataset.loaded !== "true") {
+              normalCheckbox.checked = false;
+              setStatus(card, "请先载入模型", "error");
+              return;
+            }
+
+            const n = await initNormal(card);
+            if (!n) {
+              normalCheckbox.checked = false;
+              return;
+            }
+
+            n.active = true;
+            clayViewer.style.visibility = "hidden";
+            n.canvas.style.display = "block";
+          } else {
+            if (card._normal) {
+              card._normal.active = false;
+              card._normal.canvas.style.display = "none";
+            }
+            clayViewer.style.visibility = "";
+          }
+        });
+
+        // 避免未使用变量被某些检查器标记，同时保留语义清晰的引用
+        void texturedViewer;
+      }
+
+      loadAllButton.addEventListener("click", loadAllModels);
+
+      // 组内全部模型加载完成后，把 Load 3D 按钮切换成红色 Close
+      function updateGroupLoadButton(groupIndex) {
+        const button = document.querySelector(`[data-load-group="${groupIndex}"]`);
+        if (!button) return;
+        const groupCards = cards.filter(
+          (card) => Number(card.dataset.groupIndex) === groupIndex
+        );
+        const allReady = groupCards.length > 0 && groupCards.every((card) => {
+          const status = card.querySelector('.model-status');
+          return status && status.dataset.state === 'ready';
+        });
+        if (allReady) {
+          button.disabled = false;
+          button.classList.add('is-close');
+          button.textContent = '\u2715 Close';
+        }
+      }
+
+      function resetGroupLoadButton(button) {
+        button.disabled = false;
+        button.classList.remove('is-close');
+        button.textContent = 'Load 3D';
+      }
+
+      for (const button of document.querySelectorAll('[data-load-group]')) {
+        button.addEventListener('click', () => {
+          const groupIndex = Number(button.dataset.loadGroup);
+
+          // Close 状态：释放该组模型
+          if (button.classList.contains('is-close')) {
+            const groupCards = cards.filter(
+              (card) => Number(card.dataset.groupIndex) === groupIndex
+            );
+            for (const card of groupCards) {
+              unloadCard(card);
+            }
+            resetGroupLoadButton(button);
+            return;
+          }
+
+          button.disabled = true;
+          button.textContent = 'Loading...';
+          const loadCount = loadGroup(groupIndex);
+          if (loadCount === 0) {
+            button.disabled = false;
+            button.textContent = 'No Models Configured';
+          }
+        });
+      }
+
+      unloadAllButton.addEventListener("click", () => {
+        for (const card of cards) {
+          // 精选展示组常驻，不受“释放模型”影响
+          if (card.dataset.showcase === 'true') continue;
+          unloadCard(card);
+        }
+        for (const button of document.querySelectorAll('[data-load-group]')) {
+          resetGroupLoadButton(button);
+        }
+        state.initialized = false;
+      });
+
+      normalModeToggle.addEventListener("change", () => {
+        setGlobalNormalMode(normalModeToggle.checked);
+      });
+
+      autoRotateToggle.addEventListener("change", () => {
+        state.autoRotate = autoRotateToggle.checked;
+        state.resumeAutoRotateAt = 0;
+      });
+
+      function showGroupImage(group, source, displayName) {
+        if (!group || !source) return;
+        const preview = group.querySelector('.input-preview');
+        const placeholder = group.querySelector('.image-placeholder');
+        const status = group.querySelector('.status');
+        status.textContent = '载入中';
+        status.dataset.state = 'loading';
+        preview.onload = () => {
+          preview.classList.add('is-visible');
+          if (placeholder) placeholder.style.display = 'none';
+          status.textContent = displayName || '已就绪';
+          status.dataset.state = 'ready';
+        };
+        preview.onerror = () => {
+          preview.classList.remove('is-visible');
+          if (placeholder) placeholder.style.display = 'grid';
+          status.textContent = '载入失败';
+          status.dataset.state = 'error';
+        };
+        preview.src = source;
+      }
+
+      function showImage(source, displayName) {
+        showGroupImage(groups[0], source, displayName);
+      }
+
+      applyImageUrlButton.addEventListener("click", () => {
+        const source = imageUrlInput.value.trim();
+        if (!source) {
+          imageStatus.textContent = "请输入地址";
+          imageStatus.dataset.state = "error";
+          return;
+        }
+        showImage(source, "已就绪");
+      });
+
+      imageFileInput.addEventListener("change", () => {
+        const file = imageFileInput.files?.[0];
+        if (!file) {
+          return;
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+        objectUrls.add(objectUrl);
+        imageUrlInput.value = `[本地文件] ${file.name}`;
+        showImage(objectUrl, file.name);
+      });
+
+      /* =========================================================
+         ★ 预设区：把你自己的模型 / 图片路径填在这里 ★
+         - 路径相对于本 HTML 文件，例如 "models/ours.glb"
+         - 也可以填完整 URL（需要对方服务器允许 CORS）
+         - 留空 "" 表示该模型位尚未配置，不会发起加载请求
+         - 第 1 组自动载入；第 2-5 组点击各自的 Load Models 后载入
+         ========================================================= */
+      const PRESET = {
+        autoLoadFirstGroup: true,
+        groups: [
+          {
+            image: "models/group-01/reference.png",
+            models: [
+              "models/group-01/pixal3d.glb",
+              "models/group-01/pixal3d-hy3d.glb",
+              "models/group-01/rodin-gen2.5-high.glb",
+              "models/group-01/tripo-v3.1.glb",
+              "models/group-01/hunyuan3d.glb",
+              "models/group-01/pixal3d-gguf.glb"
+            ],
+            orientations: [
+              "0deg 0deg 0deg", "0deg 0deg 0deg", "0deg 0deg 0deg",
+              "0deg 0deg 90deg", "0deg 0deg 0deg", "0deg 0deg 0deg"
+            ]
+          },
+          {
+            /* ---- 精选展示组（Pixal3D + HY 贴图优秀案例，第 2 组位置）----
+               把下面 8 个路径换成你的精选模型，例如 "models/showcase/xxx.glb" */
+            image: "",
+            models: [
+             "models/showcase/ZangSiShiCong_Skin-Pixal3D+Hy贴图.glb",  
+             "models/showcase/叉Pixal3D+Hy贴图.glb",   // ← 改这里，共 8 个
+              "models/showcase/玩具车-Pixal3D+Hy贴图.glb",
+              "models/showcase/分件Pixal_Hy3D_00016_.glb",     
+              "models/showcase/Hy3D_00089_.glb",
+              "models/showcase/Pixal_Hy3D_00002_.glb",
+              "models/showcase/Pixal_Hy3D_00003_.glb",
+              "models/showcase/Pixal_Hy3D_00010_.glb"
+            ],
+            orientations: []
+          },
+          {
+            image: "models/group-02/reference.jpg",
+            models: [
+              "models/group-02/pixal3d.glb", "models/group-02/pixal3d-hy3d.glb",
+              "models/group-02/rodin-gen2.5-high.glb", "models/group-02/tripo-v3.1.glb",
+              "models/group-02/hunyuan3d.glb", "models/group-02/pixal3d-gguf.glb"
+            ],
+            orientations: []
+          },
+          {
+            image: "models/group-03/reference.png",
+            models: [
+              "models/group-03/pixal3d.glb", "models/group-03/pixal3d-hy3d.glb",
+              "models/group-03/rodin-gen2.5-high.glb", "models/group-03/tripo-v3.1.glb",
+              "models/group-03/hunyuan3d.glb", "models/group-03/pixal3d-gguf.glb"
+            ],
+            orientations: []
+          },
+          {
+            image: "models/group-04/reference.png",
+            models: [
+              "models/group-04/pixal3d.glb", "models/group-04/pixal3d-hy3d.glb",
+              "models/group-04/rodin-gen2.5-high.glb", "models/group-04/tripo-v3.1.glb",
+              "models/group-04/hunyuan3d.glb", "models/group-04/pixal3d-gguf.glb"
+            ],
+            orientations: []
+          },
+          {
+            image: "models/group-05/reference.png",
+            models: [
+              "models/group-05/上身原图.glb", "models/group-05/上身优化输入后.glb",
+              "models/group-05/rodin-gen2.5-high.glb", "models/group-05/tripo-v3.1.glb",
+              "models/group-05/hunyuan3d.glb", "models/group-05/pixal3d-gguf.glb"
+            ],
+            orientations: []
+          }
+        ]
+      };
+
+      (function applyPreset() {
+        groups.forEach((group, groupIndex) => {
+          const preset = PRESET.groups[groupIndex] || {};
+          const groupCards = [...group.querySelectorAll('[data-model-card]')];
+          groupCards.forEach((card, modelIndex) => {
+            const src = ((preset.models || [])[modelIndex] || '').trim();
+            card.dataset.source = src;
+            const urlInput = card.querySelector('.model-url');
+            if (urlInput && src) urlInput.value = src;
+
+            const orientation =
+              ((preset.orientations || [])[modelIndex] || '0deg 0deg 0deg').trim();
+            card.dataset.orientation = orientation;
+            for (const viewer of card.querySelectorAll('model-viewer')) {
+              viewer.setAttribute('orientation', orientation);
+            }
+          });
+
+          if (preset.image && preset.image.trim()) {
+            showGroupImage(group, preset.image.trim(), '已就绪');
+            if (groupIndex === 0) {
+              imageUrlInput.value = preset.image.trim();
+            }
+          }
+        });
+
+        if (PRESET.autoLoadFirstGroup) {
+          const start = () => window.setTimeout(() => {
+            loadGroup(0);
+            loadGroup(1); // 精选展示组：打开页面自动加载，保持常驻
+          }, 250);
+          if (document.readyState === 'complete') {
+            start();
+          } else {
+            window.addEventListener('load', start, { once: true });
+          }
+        }
+      })();
+
+      function animationLoop(now) {
+        const delta = Math.min(50, now - state.lastFrameTime);
+        state.lastFrameTime = now;
+
+        if (
+          state.autoRotate &&
+          !state.isInteracting &&
+          now >= state.resumeAutoRotateAt
+        ) {
+          state.theta += delta * 0.00022;
+          syncCameras();
+        }
+
+        renderNormals();
+        requestAnimationFrame(animationLoop);
+      }
+
+      requestAnimationFrame(animationLoop);
+
+      window.addEventListener("beforeunload", () => {
+        for (const objectUrl of objectUrls) {
+          URL.revokeObjectURL(objectUrl);
+        }
+      });
+    })();
+  </script>
+
+  <div id="debug-error-log" style="display:none; background:#7f1d1d; color:#fecaca; padding:10px 16px; font-size:12px; font-family:monospace; position:fixed; bottom:0; left:0; right:0; z-index:9999; max-height:120px; overflow:auto; border-top:1px solid #f87171;"></div>
+  <script>
+    window.addEventListener('error', function(e) {
+      var box = document.getElementById('debug-error-log');
+      if(box) { box.style.display = 'block'; box.innerHTML += '<div>[加载/语法报错] ' + (e.message || e) + '</div>'; }
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      var _r = e.reason || e;
+      var _s = (_r && _r.stack) ? String(_r.stack) : '';
+      if (_s.indexOf('model-viewer.min.js') !== -1) { e.preventDefault(); return; }
+      var box = document.getElementById('debug-error-log');
+      if(box) { box.style.display = 'block'; var r = e.reason || e; box.innerHTML += '<div>[Promise报错] ' + r + '<br><small>' + ((r && r.stack) ? String(r.stack).replace(/</g,'&lt;') : '无堆栈') + '</small></div>'; }
+    });
+  </script>
+</body>
+</html>
